@@ -37,23 +37,41 @@
    #:compare-exchange
    #:atomic-incf
    #:atomic-decf
+   #:atomic-exchange
    #:finalize
    #:thread
-   #:make-thread
+   #:impl-make-thread
    #:threadp
    #:current-thread
-   #:condvar
-   #:make-condvar
-   #:condvarp
+   #:thread-join
+   #:thread-yield
+   #:impl-condvar
+   #:impl-make-condvar
+   #:impl-condvarp
    #:lock
    #:make-lock
    #:lockp
    #:lock-acquire
+   #:lock-try-acquire
    #:lock-release
    #:with-lock
-   #:cond-wait
-   #:cond-pulse
-   #:cond-pulse-all
+   #:impl-cond-wait
+   #:impl-cond-pulse
+   #:impl-cond-pulse-all
+   #:mutex
+   #:make-mutex
+   #:mutexp
+   #:mutex-acquire
+   #:mutex-release
+   #:mutex-try-acquire
+   #:with-mutex
+   #:semaphore
+   #:make-semaphore
+   #:semaphorep
+   #:semaphore-acquire
+   #:semaphore-try-acquire
+   #:semaphore-release
+   #:semaphore-count
    ))
 
 (in-package #:clr.impl)
@@ -369,10 +387,17 @@
 (defmacro atomic-decf (place &optional (diff 1))
   `(atomic-incf ,place (- ,diff)))
 
+(defmacro atomic-exchange (place value)
+  (let ((val (gensym)) (old (gensym)))
+    `(loop :with ,val = ,value
+           :for ,old = ,place :do
+      (when (eq ,old (sb-ext:compare-and-swap ,place ,old ,val))
+        (return ,old)))))
+
 (defun finalize (object callback)
   (sb-ext:finalize object callback))
 
-(defun make-thread (function &rest args)
+(defun impl-make-thread (function &optional (args '()))
   (sb-thread:make-thread function :arguments args))
 
 (deftype thread () 'sb-thread:thread)
@@ -382,15 +407,23 @@
 (defun current-thread ()
   sb-thread:*current-thread*)
 
-(defun make-condvar ()
+(defun thread-join (thread &optional timeout)
+  (declare (type thread thread)
+           (type (or null (integer 0 #.(1- most-positive-fixnum))) timeout))
+  (sb-thread:join-thread thread :timeout (and timeout (/ timeout 1000.0d0))))
+
+(defun thread-yield ()
+  (sb-thread:thread-yield))
+
+(defun impl-make-condvar ()
   (sb-thread:make-waitqueue))
 
-(deftype condvar () 'sb-thread:waitqueue)
+(deftype impl-condvar () 'sb-thread:waitqueue)
 
-(defun condvarp (obj) (typep obj 'condvar))
+(defun impl-condvarp (obj) (typep obj 'impl-condvar))
 
 (defun make-lock ()
-  (sb-thread:make-mutex))
+  (sb-thread:make-mutex :name "Anonymous CLR Lock"))
 
 (deftype lock () 'sb-thread:mutex)
 
@@ -400,6 +433,10 @@
   (declare (type lock lock))
   (sb-thread:grab-mutex lock))
 
+(defun lock-try-acquire (lock)
+  (declare (type lock lock))
+  (sb-thread:grab-mutex lock :waitp nil))
+
 (defun lock-release (lock)
   (declare (type lock lock))
   (sb-thread:release-mutex lock))
@@ -407,9 +444,9 @@
 (defmacro with-lock ((lock) &body body)
   `(sb-thread:with-mutex (,lock) ,@body))
 
-(defun cond-wait (cv lock &optional timeout)
+(defun impl-cond-wait (cv lock &optional timeout)
   (declare (type lock lock)
-           (type condvar cv)
+           (type impl-condvar cv)
            (type (or null (integer 0 #.most-positive-fixnum)) timeout))
   (let ((rv (sb-thread:condition-wait
              cv lock :timeout (and timeout (/ timeout 1000.0d0)))))
@@ -417,10 +454,68 @@
       (lock-acquire lock))
     rv))
 
-(defun cond-pulse (cv)
-  (declare (type condvar cv))
+(defun impl-cond-pulse (cv)
+  (declare (type impl-condvar cv))
   (sb-thread:condition-notify cv))
 
-(defun cond-pulse-all (cv)
-  (declare (type condvar cv))
+(defun impl-cond-pulse-all (cv)
+  (declare (type impl-condvar cv))
   (sb-thread:condition-broadcast cv))
+
+(defun make-mutex (&key name)
+  (sb-thread:make-mutex :name name))
+
+(deftype mutex () 'sb-thread:mutex)
+
+(defun mutexp (obj) (typep obj 'mutex))
+
+(defun mutex-acquire (mutex &key timeout)
+  (declare (type mutex mutex)
+           (type (or null (integer 0 #.most-positive-fixnum)) timeout))
+  (sb-thread:grab-mutex mutex :timeout (and timeout (/ timeout 1000.0d0))))
+
+(defun mutex-try-acquire (mutex)
+  (declare (type mutex mutex))
+  (sb-thread:grab-mutex mutex :waitp nil))
+
+(defun mutex-release (mutex)
+  (declare (type mutex mutex))
+  (sb-thread:release-mutex mutex))
+
+(defmacro with-mutex ((mutex &key timeout) &body body)
+  (let ((tm (gensym)))
+    `(let ((,tm ,timeout))
+       (declare (type (or null (integer 0 #.most-positive-fixnum)) ,tm))
+       (sb-thread:with-mutex (,mutex :timeout (and ,tm (/ ,tm 1000.0d0)))
+         ,@body))))
+
+(defun make-semaphore (&key name (count 0))
+  (declare (type (integer 0 #.most-positive-fixnum) count))
+  (sb-thread:make-semaphore :name name :count count))
+
+(deftype semaphore () 'sb-thread:semaphore)
+
+(defun semaphorep (obj) (typep obj 'semaphore))
+
+(defun semaphore-acquire (semaphore &key timeout (count 1))
+  (declare (type semaphore semaphore)
+           (type (or null (integer 0 #.most-positive-fixnum)) timeout)
+           (type (integer 1 #.most-positive-fixnum) count))
+  (apply #'sb-thread:wait-on-semaphore
+         semaphore
+         :n count
+         (if timeout '(:timeout (and timeout (/ timeout 1000.0d0))))))
+
+(defun semaphore-try-acquire (semaphore &key (count 1))
+  (declare (type semaphore semaphore)
+           (type (integer 1 #.most-positive-fixnum) count))
+  (sb-thread:try-semaphore semaphore count))
+
+(defun semaphore-release (semaphore &key (count 1))
+  (declare (type semaphore semaphore)
+           (type (integer 1 #.most-positive-fixnum) count))
+  (sb-thread:signal-semaphore semaphore count))
+
+(defun semaphore-count (semaphore)
+  (declare (type semaphore semaphore))
+  (sb-thread:semaphore-count semaphore))

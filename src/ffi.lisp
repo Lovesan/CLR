@@ -80,7 +80,7 @@
     ((:int8 :uint8 :char :byte) 1)
     ((:int16 :uint16 :short :ushort) 2)
     ((:int32 :uint32 :int :uint :float :boolean :bool
-             #+(or (not clr:windows) clr:x32) :double
+             #+(and (not clr:windows) clr:x32) :double
              #+clr:windows :long #+clr:windows :ulong)
      4)
     ((:int64 :uint64 :long-long :ulong-long #+(or clr:windows clr:x64) :double

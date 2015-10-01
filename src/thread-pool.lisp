@@ -1,9 +1,6 @@
 (in-package #:clr.threading)
 
-(defconstant +tpool-timeout+ 5000)
-
-(define-condition thread-pool-error (error)
-  ((pool :accessor tpool-error-pool :initform nil)))
+(defconstant +default-thread-pool-idle-timeout+ 5000)
 
 (defstruct (thread-pool
             (:constructor %make-tpool)
@@ -18,11 +15,15 @@
                 :read-only t)
   (live-threads 0              :type index) ;; number of active threads
   (busy-threads 0              :type index) ;; number of busy threads
-  (cv           (make-condvar) :type condvar ;; condvar used to signal new jobs
+  (cv           (make-condition-variable (make-lock)) ;; condvar used to signal new jobs
+                :type condition-variable
                 :read-only t)
   (lock         (make-lock)    :type lock ;; pool lock
                 :read-only t)
   (jobs         (make-queue)   :type queue ;; queue of jobs
+                               :read-only t)
+  (timeout      +default-thread-pool-idle-timeout+ ;; thread idle timeout
+                :type index
                 :read-only t))
 
 (defun tpool-function (tpool)
@@ -33,7 +34,8 @@
                    (live-threads %tpool-live-threads)
                    (cv %tpool-cv)
                    (lock %tpool-lock)
-                   (jobs %tpool-jobs))
+                   (jobs %tpool-jobs)
+                   (timeout %tpool-timeout))
       tpool
     (let ((thread (current-thread)))
       (with-lock (lock)
@@ -43,7 +45,7 @@
            (loop :named job-loop :do
              (let ((job (with-lock (lock)
                           (loop :while (queue-empty-p jobs) :do
-                            (when (and (not (cond-wait cv lock +tpool-timeout+)) ;; timeout
+                            (when (and (not (cv-wait cv timeout))
                                        (> live-threads min-threads))
                               (return-from job-loop)))
                           (incf busy-threads)
@@ -55,7 +57,7 @@
           (decf live-threads)
           (setf threads (remove thread threads :test #'eq)))))))
 
-(defun tpool-add (tpool func &rest args)
+(defun tpoolcall (tpool func &rest args)
   (declare (type thread-pool tpool))
   (with-accessors ((min-threads %tpool-min-threads)
                    (max-threads %tpool-max-threads)
@@ -70,15 +72,24 @@
       (when (or (< live-threads min-threads)
                 (and (< live-threads max-threads)
                      (>= busy-threads live-threads)))
-        (make-thread #'tpool-function tpool))
-      (cond-pulse cv))))
+        (make-thread #'tpool-function :args (list tpool)))
+      (cv-pulse cv)
+      (values))))
 
-(defun make-thread-pool (&optional (min-threads 0) max-threads)
+(defun make-thread-pool (&key (min-threads 0)
+                              max-threads
+                              (idle-timeout +default-thread-pool-idle-timeout+))
   (declare (type index min-threads)
-           (type (or null index) max-threads))
+           (type (or null index) max-threads)
+           (type index idle-timeout))
   (let* ((cpu-count (cpu-count))
          (max-threads (max min-threads
                            cpu-count
-                           (or max-threads 0))))
+                           (or max-threads 0)))
+         (lock (make-lock))
+         (cv (make-condition-variable lock)))
     (%make-tpool :min-threads min-threads
-                 :max-threads max-threads)))
+                 :max-threads max-threads
+                 :lock lock
+                 :cv cv
+                 :timeout idle-timeout)))

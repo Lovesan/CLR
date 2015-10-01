@@ -1,11 +1,12 @@
 (in-package #:cl-user)
 
-(flet ((cl-file (f) (load (compile-file (truename f)))))
-  (cl-file "src/clr.lisp")
-  #+sbcl
-  (cl-file "src/impl-sbcl.lisp")
-  #-(or sbcl)
-  (error "Implementation not supported"))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (flet ((cl-file (f) (load (compile-file (truename f)))))
+    (cl-file "src/clr.lisp")
+    #+sbcl
+    (cl-file "src/impl-sbcl.lisp")
+    #-(or sbcl)
+    (error "Implementation not supported")))
 
 (flet ((cl-file (f) (load (compile-file (truename f)))))
   (cl-file "src/base-types.lisp")
