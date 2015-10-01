@@ -12,6 +12,7 @@
    #:x86-64
    #:windows
    #:unix
+   #:linux
 
    ;;; base types
    #:int8

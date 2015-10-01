@@ -81,6 +81,7 @@
                clr:sbcl
                #+win32 clr:windows
                #-win32 clr:unix
+               #+linux clr:linux
                #+x86-64 clr:x86-64
                #+(and x86 (not x86-64)) clr:x86))
     (pushnew f *features*))

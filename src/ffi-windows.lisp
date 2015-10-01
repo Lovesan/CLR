@@ -31,7 +31,7 @@
   (proc-rev :uint32))
 
 (defun cpu-count ()
-  "Returieves current CPU count"
+  "Retrieves current CPU count"
   (with-cptr (p system-info)
     (unless (syscall "GetSystemInfo" :pointer p :bool)
       (error "Unable to get system information"))

@@ -19,6 +19,8 @@
   (cl-file "src/ffi.lisp")
   #+clr:windows
   (cl-file "src/ffi-windows.lisp")
+  #+clr:linux
+  (cl-file "src/ffi-linux.lisp")
   (cl-file "src/threading.lisp")
   (cl-file "src/thread-pool.lisp")
   )
