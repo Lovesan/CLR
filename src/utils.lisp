@@ -5,6 +5,7 @@
   (:export #:with-gensyms
            #:mklist
            #:lastcar
+           #:nlx-protect
            ))
 
 (in-package #:clr.utils)
@@ -24,4 +25,8 @@
 (declaim (inline lastcar))
 (defun lastcar (l) (car (last l)))
 
-
+(defmacro nlx-protect (body &rest protected-forms)
+  (let ((var (gensym (string '#:nlx))))
+    `(let ((,var t))
+       (unwind-protect (prog1 ,body (setf ,var nil))
+         (when ,var ,@protected-forms)))))
