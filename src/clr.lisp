@@ -35,4 +35,10 @@
    #:uintptr
    #:simple-char-string
    #:index
+
+   ;;; base utils
+   #:with-object
+   #:with-objects
+   #:dispose
+   #:defdispose
    ))

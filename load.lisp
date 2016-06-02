@@ -12,7 +12,7 @@
   (cl-file "src/base-types.lisp")
   (cl-file "src/utils.lisp")
   (cl-file "src/collections.lisp")
-  (cl-file "src/iterators.lisp")
+  ;;(cl-file "src/iterators.lisp")
   (cl-file "src/queue.lisp")
   (cl-file "src/stack.lisp")
   (cl-file "src/concurrent-stack.lisp")
