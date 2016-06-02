@@ -149,3 +149,42 @@
             :size (%dict-count dict)
             :buckets (length (%dict-buckets dict))))
   dict)
+
+;;; Allows for Clojure-like syntax, e.g. {:a 1 :b 2}
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun read-dict-brace (s c)
+    (declare (ignore c))
+    (let ((list (read-delimited-list #\} s t))
+          (setfs '())
+          (var (gensym (string '#:dict))))
+      (loop :for (key . rest) :on list :by #'cddr
+            :do (push `(setf (dref ,var ,key) ,(car rest)) setfs))
+      `(let ((,var (%make-dict)))
+         ,@(nreverse setfs)
+         ,var)))
+
+  (defun read-dict-close-brace (s c)
+    (declare (ignore s c))
+    (error "Unmatched close brace"))
+
+  (defvar *dict-readtables* '())
+
+  (defun %enable-dict-syntax ()
+    (push *readtable* *dict-readtables*)
+    (setf *readtable* (copy-readtable))
+    (set-macro-character #\{ #'read-dict-brace)
+    (set-macro-character #\} #'read-dict-close-brace)
+    (values))
+
+  (defun %disable-dict-syntax ()
+    (unless (endp *dict-readtables*)
+      (setf *readtable* (pop *dict-readtables*)))
+    (values)))
+
+(defmacro enable-dict-syntax ()
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (%enable-dict-syntax)))
+
+(defmacro disable-dict-syntax ()
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (%disable-dict-syntax)))

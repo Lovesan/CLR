@@ -43,4 +43,6 @@
    #:dict-remove
    #:dict-alist
    #:dict-hash-table
+   #:enable-dict-syntax
+   #:disable-dict-syntax
    ))
