@@ -12,6 +12,7 @@
    #:queue-clear
    #:queue-size
    #:queue-empty-p
+
    #:stack
    #:stack-p
    #:make-stack
@@ -21,6 +22,7 @@
    #:stack-peek
    #:stack-size
    #:stack-empty-p
+
    #:concurrent-stack
    #:make-concurrent-stack
    #:cstack-p
@@ -30,4 +32,15 @@
    #:cstack-clear
    #:cstack-size
    #:cstack-empty-p
+
+   #:dict
+   #:make-dict
+   #:dict-p
+   #:dict-clear
+   #:dict-size
+   #:dict-empty-p
+   #:dref
+   #:dict-remove
+   #:dict-alist
+   #:dict-hash-table
    ))

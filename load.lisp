@@ -16,6 +16,7 @@
   (cl-file "src/queue.lisp")
   (cl-file "src/stack.lisp")
   (cl-file "src/concurrent-stack.lisp")
+  (cl-file "src/dict.lisp")
   (cl-file "src/ffi.lisp")
   #+clr:windows
   (cl-file "src/ffi-windows.lisp")

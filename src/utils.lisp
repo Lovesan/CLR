@@ -60,3 +60,11 @@
 
 (clr:defdispose (object stream &key (abort nil))
   (close object :abort abort))
+
+(defgeneric clr:hash (object)
+  (:documentation "Computes object hash code")
+  (:method (object) (sxhash object)))
+
+(defgeneric clr:equals (object other)
+  (:documentation "Tests whether OBJECT equals OTHER object")
+  (:method (object other) (equal object other)))

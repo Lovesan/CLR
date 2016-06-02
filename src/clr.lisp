@@ -41,4 +41,6 @@
    #:with-objects
    #:dispose
    #:defdispose
+   #:hash
+   #:equals
    ))
