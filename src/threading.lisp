@@ -84,13 +84,17 @@
   (declare (type condition-variable cv))
   (impl-cond-pulse-all (%cv-condvar cv)))
 
-(defun make-thread (function &key (args '()) #+clr:windows sta)
+(defun make-thread (function &key (args '())
+                                  #+clr:windows sta
+                             &allow-other-keys)
   (declare (type list args))
   #+clr:windows
   (if sta
     (impl-make-thread
      (lambda ()
        (with-sta-apartment (apply function args))))
-    (impl-make-thread function args))
+    (impl-make-thread
+     (lambda ()
+       (with-mta-apartment (apply function args)))))
   #-clr:windows
   (impl-make-thread function args))

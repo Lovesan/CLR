@@ -4,7 +4,8 @@
   (:use #:cl #:clr #:clr.impl #:clr.ffi)
   (:export
    #:cpu-count
-   #:with-sta-apartment))
+   #:with-sta-apartment
+   #:with-mta-apartment))
 
 (in-package #:clr.ffi.impl)
 
@@ -47,7 +48,22 @@
   (olecall "OleUninitialize")
   t)
 
+(defun initialize-mta ()
+  (let ((rv (olecall "CoInitializeEx" :pointer (nullptr) :int 0 :int)))
+    (when (< rv 0)
+      (error "Unable to initialize MTA"))
+    t))
+
+(defun release-mta ()
+  (olecall "CoUninitialize")
+  t)
+
 (defmacro with-sta-apartment (&body body)
   `(progn (initialize-sta)
           (unwind-protect (progn ,@body)
             (release-sta))))
+
+(defmacro with-mta-apartment (&body body)
+  `(progn (initialize-mta)
+          (unwind-protect (progn ,@body)
+            (release-mta))))
