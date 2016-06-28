@@ -1,3 +1,4 @@
+
 (in-package #:cl-user)
 
 (defpackage #:clr.utils
@@ -31,10 +32,44 @@
        (unwind-protect (prog1 ,body (setf ,var nil))
          (when ,var ,@protected-forms)))))
 
+(defstruct (clr:disposable-struct
+            (:conc-name %dstruct-)
+            (:constructor nil)
+            (:predicate clr:disposable-struct-p)
+            (:copier nil))
+  "Represents disposable struct"
+  (%disposed nil))
+
+(defclass clr:disposable-object ()
+  ((%disposed :initform nil
+              :accessor %dobject-disposed)))
+
+(defgeneric clr:disposedp (object &key &allow-other-keys)
+  (:documentation "Returs non-NIL if an object is already disposed")
+  (:method (object &key &allow-other-keys)
+    (declare (ignore object))
+    nil)
+  (:method ((object disposable-struct) &key &allow-other-keys)
+    (%dstruct-%disposed object))
+  (:method ((object disposable-object) &key &allow-other-keys)
+    (%dobject-disposed object)))
+
 (defgeneric clr:dispose (object &key &allow-other-keys)
   (:documentation "Disposes an OBJECT")
   (:method-combination progn :most-specific-first)
-  (:method progn (object &key &allow-other-keys) (values)))
+  (:method progn (object &key &allow-other-keys)
+    (declare (ignore object))
+    (values))
+  (:method progn ((object disposable-struct) &key &allow-other-keys)
+    (setf (%dstruct-%disposed object) t)
+    (values))
+  (:method progn ((object disposable-object) &key &allow-other-keys)
+    (setf (%dobject-disposed object) t)
+    (values))
+  (:method :around (object &key &allow-other-keys)
+    (unless (clr:disposedp object)
+      (call-next-method))
+    (values)))
 
 (defmacro clr:with-object ((var object) &body body)
   "Executes BODY inside dynamic extent where OBJECT is bound to VAR and
@@ -55,8 +90,15 @@
 
 (defmacro clr:defdispose ((object class &rest keys) &body body)
   "Defines DISPOSE method on an OBJECT of specified CLASS"
-  `(defmethod clr:dispose progn ((,object ,class) ,@keys)
-     ,@body))
+  (let ((has-key (find '&key keys))
+        (has-aak (find '&allow-other-keys keys)))
+  `(defmethod clr:dispose progn
+       ((,object ,class)
+        ,@keys
+        ,@(cond (has-aak '())
+                (has-key '(&allow-other-keys))
+                (t '(&key &allow-other-keys))))
+     ,@body)))
 
 (clr:defdispose (object stream &key (abort nil))
   (close object :abort abort))

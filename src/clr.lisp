@@ -37,10 +37,14 @@
    #:index
 
    ;;; base utils
-   #:with-object
-   #:with-objects
+   #:disposable-struct
+   #:disposable-struct-p
+   #:disposable-object
+   #:disposedp
    #:dispose
    #:defdispose
+   #:with-object
+   #:with-objects
    #:hash
    #:equals
    ))
