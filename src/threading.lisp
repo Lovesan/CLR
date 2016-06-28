@@ -54,9 +54,11 @@
    #:cv-pulse-all
 
    ;; Thread pool
+   #:*default-thread-pool*
    #:make-thread-pool
    #:+default-thread-pool-idle-timeout+
    #:tpoolcall
+   #:dpoolcall
    ))
 
 (in-package #:clr.threading)

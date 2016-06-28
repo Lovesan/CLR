@@ -26,6 +26,27 @@
                 :type index
                 :read-only t))
 
+(defun make-thread-pool (&key (min-threads 0)
+                              max-threads
+                              (idle-timeout +default-thread-pool-idle-timeout+))
+  "Creates a THREAD-POOL"
+  (declare (type index min-threads)
+           (type (or null index) max-threads)
+           (type index idle-timeout))
+  (let* ((cpu-count (cpu-count))
+         (max-threads (max min-threads
+                           cpu-count
+                           (or max-threads 0)))
+         (lock (make-lock))
+         (cv (make-condition-variable lock)))
+    (%make-tpool :min-threads min-threads
+                 :max-threads max-threads
+                 :lock lock
+                 :cv cv
+                 :timeout idle-timeout)))
+
+(defvar *default-thread-pool* (make-thread-pool))
+
 (defun tpool-function (tpool)
   (declare (type thread-pool tpool))
   (with-accessors ((threads %tpool-threads)
@@ -58,6 +79,7 @@
           (setf threads (remove thread threads :test #'eq)))))))
 
 (defun tpoolcall (tpool func &rest args)
+  "Executes a FUNC in a context of a specified thread pool TPOOL"
   (declare (type thread-pool tpool))
   (with-accessors ((min-threads %tpool-min-threads)
                    (max-threads %tpool-max-threads)
@@ -76,20 +98,6 @@
       (cv-pulse cv)
       (values))))
 
-(defun make-thread-pool (&key (min-threads 0)
-                              max-threads
-                              (idle-timeout +default-thread-pool-idle-timeout+))
-  (declare (type index min-threads)
-           (type (or null index) max-threads)
-           (type index idle-timeout))
-  (let* ((cpu-count (cpu-count))
-         (max-threads (max min-threads
-                           cpu-count
-                           (or max-threads 0)))
-         (lock (make-lock))
-         (cv (make-condition-variable lock)))
-    (%make-tpool :min-threads min-threads
-                 :max-threads max-threads
-                 :lock lock
-                 :cv cv
-                 :timeout idle-timeout)))
+(defun dpoolcall (func &rest args)
+  "Executes FUNC in a context of the default thread pool"
+  (apply #'tpoolcall *default-thread-pool* func args))
